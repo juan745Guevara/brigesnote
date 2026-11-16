@@ -83,6 +83,67 @@ class SyncLocationsTest extends TestCase
         $this->assertSame(0, Region::count());
     }
 
+    public function test_pagina_los_colegios_de_50_en_50(): void
+    {
+        // 76 colegios: la API devuelve 50 sin start y 26 con start=50
+        $schools = array_map(fn ($i) => ['codMod' => sprintf('%07d', $i), 'cenEdu' => "IE $i"], range(1, 76));
+
+        $this->fakeSingleDistrict(function (array $query) use ($schools) {
+            return ['items' => array_slice($schools, (int) ($query['start'] ?? 0), 50)];
+        });
+
+        $this->artisan('sync:locations')->assertSuccessful();
+
+        $this->assertSame(76, School::count());
+        $this->assertTrue(School::whereKey('0000076')->exists());
+        Http::assertSentCount(5); // regiones, provincias, distritos, 2 páginas de colegios
+    }
+
+    public function test_pagina_exacta_de_50_pide_una_pagina_vacia_y_para(): void
+    {
+        $schools = array_map(fn ($i) => ['codMod' => sprintf('%07d', $i)], range(1, 50));
+
+        $this->fakeSingleDistrict(function (array $query) use ($schools) {
+            return isset($query['start']) ? ['@uri' => 'x'] : ['items' => $schools];
+        });
+
+        $this->artisan('sync:locations')->assertSuccessful();
+
+        $this->assertSame(50, School::count());
+        Http::assertSentCount(5);
+    }
+
+    public function test_si_la_api_ignora_start_no_entra_en_bucle(): void
+    {
+        $schools = array_map(fn ($i) => ['codMod' => sprintf('%07d', $i)], range(1, 50));
+
+        $this->fakeSingleDistrict(fn () => ['items' => $schools]);
+
+        $this->artisan('sync:locations')->assertSuccessful();
+
+        $this->assertSame(50, School::count());
+        Http::assertSentCount(5);
+    }
+
+    /**
+     * Una región > una provincia > un distrito (150101); $schools recibe la query
+     * de /instituciones y devuelve el cuerpo JSON.
+     */
+    private function fakeSingleDistrict(callable $schools): void
+    {
+        Http::fake(function (Request $request) use ($schools) {
+            $url = $request->url();
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+            return match (true) {
+                str_starts_with($url, self::BASE.'/regiones') => Http::response(['region' => ['idRegion' => '15']]),
+                str_starts_with($url, self::BASE.'/provincias') => Http::response(['provincia' => ['idProvincia' => '1501']]),
+                str_starts_with($url, self::BASE.'/distritos') => Http::response(['distrito' => ['idDistrito' => '150101']]),
+                str_starts_with($url, self::BASE.'/instituciones') => Http::response($schools($query)),
+            };
+        });
+    }
+
     public function test_fallo_de_conexion_no_detiene_el_comando(): void
     {
         Http::fake(function (Request $request) {

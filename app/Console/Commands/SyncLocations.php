@@ -20,6 +20,12 @@ class SyncLocations extends Command
 
     private const BASE_URL = 'https://escale.minedu.gob.pe/padron/rest';
 
+    /** Tamaño de página fijo de /instituciones en ESCALE. */
+    private const SCHOOLS_PAGE_SIZE = 50;
+
+    /** Tope de seguridad: 200 páginas = 10.000 colegios por distrito. */
+    private const SCHOOLS_MAX_PAGES = 200;
+
     public function handle(): int
     {
         $this->info('Iniciando sincronización de ubicaciones...');
@@ -116,36 +122,68 @@ class SyncLocations extends Command
     {
         $this->info("Sincronizando escuelas para el distrito $districtId...");
 
-        $response = $this->get('instituciones', ['estados' => 1, 'ubigeo' => $districtId]);
+        $total = 0;
+        $previousFirst = null;
 
-        if ($response === null || $response->failed()) {
-            $this->error("Error al obtener escuelas para el distrito $districtId");
+        // La API devuelve como máximo SCHOOLS_PAGE_SIZE colegios por petición;
+        // el resto se obtiene con el parámetro start (0, 50, 100, ...).
+        for ($page = 0; $page < self::SCHOOLS_MAX_PAGES; $page++) {
+            $start = $page * self::SCHOOLS_PAGE_SIZE;
 
-            return;
+            $query = ['estados' => 1, 'ubigeo' => $districtId];
+            if ($start > 0) {
+                $query['start'] = $start;
+            }
+
+            $response = $this->get('instituciones', $query);
+
+            if ($response === null || $response->failed()) {
+                $this->error("Error al obtener escuelas para el distrito $districtId (start=$start)");
+
+                break;
+            }
+
+            $schools = $this->items($response, 'items', 'codMod');
+
+            if ($schools === []) {
+                break;
+            }
+
+            // Protección: si la API ignorara start, devolvería la misma página siempre
+            if ($schools[0]['codMod'] === $previousFirst) {
+                break;
+            }
+            $previousFirst = $schools[0]['codMod'];
+
+            foreach ($schools as $school) {
+                School::updateOrCreate(
+                    ['codMod' => $school['codMod']],
+                    [
+                        'idDistrito' => $districtId,
+                        'nombreCenEdu' => $school['cenEdu'] ?? null,
+                        'cenPob' => $school['cenPob'] ?? null,
+                        'dirCen' => $school['dirCen'] ?? null,
+                        'director' => $school['director'] ?? null,
+                        'dis_crecer' => $school['dis_crecer'] ?? null,
+                        'dis_juntos' => $school['dis_juntos'] ?? null,
+                    ]
+                );
+            }
+
+            $total += count($schools);
+
+            if (count($schools) < self::SCHOOLS_PAGE_SIZE) {
+                break;
+            }
         }
 
-        if ($response->json('items') === null) {
+        if ($total === 0) {
             $this->warn("No se encontraron registros de escuelas para el distrito $districtId");
 
             return;
         }
 
-        foreach ($this->items($response, 'items', 'codMod') as $school) {
-            School::updateOrCreate(
-                ['codMod' => $school['codMod']],
-                [
-                    'idDistrito' => $districtId,
-                    'nombreCenEdu' => $school['cenEdu'] ?? null,
-                    'cenPob' => $school['cenPob'] ?? null,
-                    'dirCen' => $school['dirCen'] ?? null,
-                    'director' => $school['director'] ?? null,
-                    'dis_crecer' => $school['dis_crecer'] ?? null,
-                    'dis_juntos' => $school['dis_juntos'] ?? null,
-                ]
-            );
-        }
-
-        $this->info("Escuelas para el distrito $districtId sincronizadas correctamente.");
+        $this->info("Escuelas para el distrito $districtId sincronizadas correctamente ($total).");
     }
 
     /**
