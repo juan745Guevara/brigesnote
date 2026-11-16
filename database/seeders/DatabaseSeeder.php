@@ -1,16 +1,16 @@
 <?php
 
+namespace Database\Seeders;
+
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
     /**
-     * Seed the application's database.
-     *
-     * @return void
+     * Los datos de ubicaciones y colegios se cargan con `php artisan sync:locations`.
      */
-    public function run()
+    public function run(): void
     {
-        // $this->call(UserSeeder::class);
+        //
     }
 }
