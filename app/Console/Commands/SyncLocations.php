@@ -7,6 +7,7 @@ use App\Models\Province;
 use App\Models\Region;
 use App\Models\School;
 use Illuminate\Console\Command;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -36,7 +37,7 @@ class SyncLocations extends Command
 
         $response = $this->get('regiones');
 
-        if ($response->failed()) {
+        if ($response === null || $response->failed()) {
             $this->error('Error al obtener regiones');
 
             return;
@@ -65,7 +66,7 @@ class SyncLocations extends Command
 
         $response = $this->get('provincias', ['idRegion' => $regionId]);
 
-        if ($response->failed()) {
+        if ($response === null || $response->failed()) {
             $this->error("Error al obtener provincias para la región $regionId");
 
             return;
@@ -93,7 +94,7 @@ class SyncLocations extends Command
 
         $response = $this->get('distritos', ['idProvincia' => $provinceId]);
 
-        if ($response->failed()) {
+        if ($response === null || $response->failed()) {
             $this->error("Error al obtener distritos para la provincia $provinceId");
 
             return;
@@ -117,7 +118,7 @@ class SyncLocations extends Command
 
         $response = $this->get('instituciones', ['estados' => 1, 'ubigeo' => $districtId]);
 
-        if ($response->failed()) {
+        if ($response === null || $response->failed()) {
             $this->error("Error al obtener escuelas para el distrito $districtId");
 
             return;
@@ -149,10 +150,17 @@ class SyncLocations extends Command
 
     /**
      * Petición GET a la API de ESCALE con reintentos y timeout.
+     * Devuelve null si no se pudo conectar (DNS, SSL, timeout) tras los reintentos.
      */
-    private function get(string $endpoint, array $query = []): Response
+    private function get(string $endpoint, array $query = []): ?Response
     {
-        return $this->client()->get(self::BASE_URL.'/'.$endpoint, $query);
+        try {
+            return $this->client()->get(self::BASE_URL.'/'.$endpoint, $query);
+        } catch (ConnectionException $e) {
+            $this->error($e->getMessage());
+
+            return null;
+        }
     }
 
     private function client(): PendingRequest

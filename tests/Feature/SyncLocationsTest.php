@@ -7,6 +7,7 @@ use App\Models\Province;
 use App\Models\Region;
 use App\Models\School;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -80,5 +81,27 @@ class SyncLocationsTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame(0, Region::count());
+    }
+
+    public function test_fallo_de_conexion_no_detiene_el_comando(): void
+    {
+        Http::fake(function (Request $request) {
+            if (str_starts_with($request->url(), self::BASE.'/regiones')) {
+                return Http::response(['region' => [
+                    ['idRegion' => '15', 'nombreRegion' => 'LIMA'],
+                    ['idRegion' => '04', 'nombreRegion' => 'AREQUIPA'],
+                ]]);
+            }
+
+            // Ej. cURL error 60 (SSL), DNS o timeout
+            throw new ConnectionException('cURL error 60: SSL certificate problem');
+        });
+
+        $this->artisan('sync:locations')
+            ->expectsOutput('Error al obtener provincias para la región 15')
+            ->expectsOutput('Error al obtener provincias para la región 04')
+            ->assertSuccessful();
+
+        $this->assertSame(2, Region::count());
     }
 }
