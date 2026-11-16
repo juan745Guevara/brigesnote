@@ -154,7 +154,7 @@ Cada petición a ESCALE usa un timeout de 30 s y hasta 3 reintentos. Si un nivel
 1. **Regiones (`/padron/rest/regiones`):** Descarga los 25 departamentos del país con sus nombres, coordenadas (`pointX`, `pointY`) y nivel de `zoom`.
 2. **Provincias (`/padron/rest/provincias?idRegion={id}`):** Por cada región, descarga sus provincias.
 3. **Distritos (`/padron/rest/distritos?idProvincia={id}`):** Por cada provincia, descarga los distritos correspondientes.
-4. **Colegios (`/padron/rest/instituciones?estados=1&ubigeo={idDistrito}`):** Por cada distrito, descarga las instituciones educativas activas y las almacena en la tabla `schools` vinculando el código modular (`codMod`) como llave primaria y asociando el `idDistrito`.
+4. **Colegios (`/padron/rest/instituciones?estados=1&ubigeo={idDistrito}&start={n}`):** Por cada distrito, descarga en páginas de 50 (`start=0, 50, 100…`) las instituciones educativas activas y las almacena en la tabla `schools` vinculando el código modular (`codMod`) como llave primaria y asociando el `idDistrito`.
 
 > ⏱️ **Nota:** La sincronización total recorre más de 1,800 distritos y 80,000 colegios, por lo que puede tomar varios minutos según la velocidad de conexión y respuesta del servidor del MINEDU.
 
@@ -311,6 +311,10 @@ brigesnote/
 ### 4. Error en tests: `could not find driver (Connection: sqlite ...)`
 - **Causa:** La extensión `pdo_sqlite` no está habilitada en tu PHP.
 - **Solución:** Descomenta `extension=pdo_sqlite` en `php.ini`, o ejecuta una sola vez `php -d extension=pdo_sqlite vendor/bin/phpunit`.
+
+### 5. Error en `sync:locations`: `cURL error 60: SSL certificate problem: unable to get local issuer certificate`
+- **Causa:** PHP en Windows no trae un paquete de certificados raíz configurado (`curl.cainfo` vacío). El certificado de MINEDU es válido.
+- **Solución:** En `php.ini`, apunta `curl.cainfo` y `openssl.cafile` a un bundle de CAs, por ejemplo el de Git para Windows (`C:\Program Files\Git\mingw64tc\ssl\certs\ca-bundle.crt`) o el `cacert.pem` de [curl.se](https://curl.se/docs/caextract.html). **No** desactives la verificación SSL.
 
 ---
 

@@ -1,6 +1,6 @@
 # Plan de migración: Laravel 7 → Laravel 12 sobre PHP 8.3
 
-> **Estado:** ejecutado en la rama `migracion/php-8.3`. Falta la verificación contra MySQL (ver sección 7).
+> **Estado:** ejecutado y verificado contra MySQL 8.0 y la API real de ESCALE (ver sección 7). Solo falta comprobar el hosting.
 >
 > **Cambio de destino:** el plan original apuntaba a Laravel 11, pero Composer bloquea todas sus versiones (hasta la 11.57.1) por avisos de seguridad sin parche. Se usó **Laravel 12 (v12.72.0)**, que tiene la misma estructura. Las referencias a Laravel 11 en las secciones 1 a 6 se refieren ahora a Laravel 12.
 > **Rama de trabajo:** `migracion/php-8.3`
@@ -162,6 +162,8 @@ Al terminar se abre un PR `migracion/php-8.3` → `main`.
 | `6777364` | Robustez de `sync:locations` |
 | `a459c1d` | Tests (13 tests, 45 aserciones, en verde) |
 | `9982067` | README para PHP 8.3 |
+| `f027d52` | `sync:locations` no se cae ante fallos de conexión (detectado con la API real) |
+| `90112b7` | Paginación de colegios: la API devuelve máximo 50 por petición |
 
 **Diferencias con el plan:**
 - Destino Laravel 12 en lugar de 11 (ver nota al inicio).
@@ -169,8 +171,17 @@ Al terminar se abre un PR `migracion/php-8.3` → `main`.
 - El `.htaccess` ahora bloquea `.env`, `.git` y los directorios internos. Antes quedaban accesibles al servir desde la raíz.
 - `QUEUE_FAILED_DRIVER` usa `database` por defecto, porque la tabla `failed_jobs` existente no tiene columna `uuid`.
 
-**Pendiente (requiere MySQL y el hosting):**
-1. `mysqldump` de `escalebridge`.
-2. `php artisan migrate:status`: todas las migraciones deben aparecer como `Ran`.
-3. Probar los 4 endpoints contra la base real y ejecutar `sync:locations`.
-4. Desplegar en el hosting con PHP 8.3 y comprobar que `/.env` y `/vendor/` devuelven 403.
+**Verificación contra el entorno real (16-11-2026):**
+- La base `escalebridge` no existía en el MySQL 8.0 local, así que se creó desde cero. Las 7 migraciones corrieron sin errores (`Ran`). No se pudo probar contra la base antigua de Laravel 7.
+- `sync:locations` contra la API real durante unos minutos, sin errores ni avisos. La base quedó con datos parciales (región Amazonas).
+- Los 4 endpoints responden por HTTP con los datos reales.
+- 17 tests, 59 aserciones, en verde.
+
+**Hallazgos que ya existían antes de la migración:**
+- **Colegios cortados en 50:** la API pagina con `start` y antes solo se leía la primera página. Corregido en `90112b7`.
+- **Anexos de un mismo colegio:** ESCALE devuelve sedes con el mismo `codMod` y distinto `anexo`. Como `codMod` es la clave primaria, la última sede sobrescribe a la anterior (en 010101 llegan 76 registros y se guardan 75). Corregirlo requiere cambiar la clave a (`codMod`, `anexo`), queda fuera de esta migración.
+- **SSL en Windows:** PHP local sin `curl.cainfo` (ver README, solución de problemas 5).
+
+**Pendiente:**
+1. Completar `sync:locations` (tarda bastante; recorre más de 1.800 distritos).
+2. Desplegar en el hosting con PHP 8.3 y comprobar que `/.env` y `/vendor/` devuelven 403.
