@@ -1,6 +1,8 @@
-# Plan de migración: Laravel 7 → Laravel 11 sobre PHP 8.3
+# Plan de migración: Laravel 7 → Laravel 12 sobre PHP 8.3
 
-> **Estado:** borrador, pendiente de aprobación
+> **Estado:** ejecutado en la rama `migracion/php-8.3`. Falta la verificación contra MySQL (ver sección 7).
+>
+> **Cambio de destino:** el plan original apuntaba a Laravel 11, pero Composer bloquea todas sus versiones (hasta la 11.57.1) por avisos de seguridad sin parche. Se usó **Laravel 12 (v12.72.0)**, que tiene la misma estructura. Las referencias a Laravel 11 en las secciones 1 a 6 se refieren ahora a Laravel 12.
 > **Rama de trabajo:** `migracion/php-8.3`
 > **Punto de restauración:** tag `v1-laravel7` sobre el commit `e947779`
 
@@ -44,37 +46,37 @@
 ## 3. Fases
 
 ### Fase 0: preparación
-- [ ] Respaldar la base: `mysqldump -u root escalebridge > backup_escalebridge.sql`
-- [ ] `git tag v1-laravel7 e947779`
-- [ ] `git checkout -b migracion/php-8.3`
-- [ ] Decidir el PHP local: instalar 8.3 en Laragon o usar 8.4 con la plataforma fijada
+- [ ] Respaldar la base: `mysqldump -u root escalebridge > backup_escalebridge.sql` *(pendiente, a cargo del equipo)*
+- [x] `git tag v1-laravel7 e947779`
+- [x] `git checkout -b migracion/php-8.3`
+- [x] Decidir el PHP local: instalar 8.3 en Laragon o usar 8.4 con la plataforma fijada
 
 ### Fase 1: esqueleto Laravel 11
-- [ ] Generar un Laravel 11 de referencia en una carpeta temporal fuera del repo
-- [ ] Reemplazar en el repo: `bootstrap/app.php`, `config/*`, `artisan`, `phpunit.xml`, `tests/TestCase.php`
-- [ ] `composer.json`:
+- [x] Generar un Laravel 11 de referencia en una carpeta temporal fuera del repo
+- [x] Reemplazar en el repo: `bootstrap/app.php`, `config/*`, `artisan`, `phpunit.xml`, `tests/TestCase.php`
+- [x] `composer.json`:
   - `"php": "^8.3"`, `"laravel/framework": "^11.0"`, `"laravel/tinker": "^2.9"`
   - Quitar `fideloper/proxy`, `fruitcake/laravel-cors` y `facade/ignition` (el framework ya los trae o tienen reemplazo)
   - Dev: `fakerphp/faker`, `mockery/mockery`, `nunomaduro/collision ^8.1`, `phpunit/phpunit ^11.0`
   - `"config": { "platform": { "php": "8.3" } }`
   - Autoload: `Database\\Factories\\` y `Database\\Seeders\\` (PSR-4) en lugar del `classmap`
-- [ ] Borrar las piezas que Laravel 11 ya integra: `app/Http/Kernel.php`, `app/Console/Kernel.php`, `app/Exceptions/Handler.php`, `app/Http/Middleware/*`, los providers que sobran y `server.php`
-- [ ] Borrar `composer.lock` y regenerarlo con `composer install`
+- [x] Borrar las piezas que Laravel 11 ya integra: `app/Http/Kernel.php`, `app/Console/Kernel.php`, `app/Exceptions/Handler.php`, `app/Http/Middleware/*`, los providers que sobran y `server.php`
+- [x] Borrar `composer.lock` y regenerarlo con `composer install`
 
 ### Fase 2: trasladar el dominio
-- [ ] Modelos `Region`, `Province`, `District` y `School`: mantener las claves string y `$fillable`, y quitar los imports que no se usan
-- [ ] Borrar `app/Region.php`, que es un duplicado vacío
-- [ ] Mover `app/User.php` a `app/Models/User.php` y actualizar `config/auth.php`
-- [ ] `SyncLocations`: Laravel 11 lo registra solo desde `app/Console/Commands`
-- [ ] `LocationController`: sin cambios de lógica, con tipos de retorno `JsonResponse`
-- [ ] `routes/api.php`: registrarlo con `->withRouting(api: __DIR__.'/../routes/api.php')` y quitar la ruta `auth:api` de `/user`
-- [ ] Migraciones de dominio: convertirlas a `return new class extends Migration` **con el mismo nombre de archivo** y quitar los `class_exists` y `hasTable` defensivos
-- [ ] Migraciones base (`users`, `password_resets`, `failed_jobs`): conservarlas como están para no romper la base existente
-- [ ] Renombrar `database/seeds` a `database/seeders` (namespace `Database\Seeders`)
-- [ ] Pasar `UserFactory` a una clase con namespace `Database\Factories`
+- [x] Modelos `Region`, `Province`, `District` y `School`: mantener las claves string y `$fillable`, y quitar los imports que no se usan
+- [x] Borrar `app/Region.php`, que es un duplicado vacío
+- [x] Mover `app/User.php` a `app/Models/User.php` y actualizar `config/auth.php`
+- [x] `SyncLocations`: Laravel 11 lo registra solo desde `app/Console/Commands`
+- [x] `LocationController`: sin cambios de lógica, con tipos de retorno `JsonResponse`
+- [x] `routes/api.php`: registrarlo con `->withRouting(api: __DIR__.'/../routes/api.php')` y quitar la ruta `auth:api` de `/user`
+- [x] Migraciones de dominio: convertirlas a `return new class extends Migration` **con el mismo nombre de archivo** y quitar los `class_exists` y `hasTable` defensivos
+- [x] Migraciones base (`users`, `password_resets`, `failed_jobs`): conservarlas como están para no romper la base existente
+- [x] Renombrar `database/seeds` a `database/seeders` (namespace `Database\Seeders`)
+- [x] Pasar `UserFactory` a una clase con namespace `Database\Factories`
 
 ### Fase 3: despliegue sin `public/`
-- [ ] Reescribir `index.php` en la raíz:
+- [x] Reescribir `index.php` en la raíz:
   ```php
   define('LARAVEL_START', microtime(true));
   if (file_exists($m = __DIR__.'/storage/framework/maintenance.php')) require $m;
@@ -82,35 +84,35 @@
   (require_once __DIR__.'/bootstrap/app.php')
       ->handleRequest(Illuminate\Http\Request::capture());
   ```
-- [ ] Revisar que `.htaccess` y `web.config` sigan reescribiendo hacia `index.php` y bloqueen el acceso a `.env`, `vendor/`, `storage/` y `bootstrap/`
-- [ ] Revisar `bootstrap/app.php` para que `basePath` apunte a la raíz
+- [x] Revisar que `.htaccess` y `web.config` sigan reescribiendo hacia `index.php` y bloqueen el acceso a `.env`, `vendor/`, `storage/` y `bootstrap/`
+- [x] Revisar `bootstrap/app.php` para que `basePath` apunte a la raíz
 
 ### Fase 4: robustez y PHP 8.3
-- [ ] `SyncLocations`:
+- [x] `SyncLocations`:
   - Usar `?? null` en **todos** los campos de colegio (hoy faltan en `cenEdu`, `cenPob` y `dirCen` en la rama de varios colegios)
   - `Http::retry(3, 500)->timeout(30)` en todas las peticiones
   - Crear un helper para normalizar "un objeto o un array de objetos", que hoy está repetido 3 veces
   - Declarar las propiedades y los tipos de los métodos
-- [ ] Revisar avisos de obsolescencia de PHP 8.3 y 8.4 (`php -d error_reporting=E_ALL artisan ...`)
+- [x] Revisar avisos de obsolescencia de PHP 8.3 y 8.4 (`php -d error_reporting=E_ALL artisan ...`)
 
 ### Fase 5: verificación
-- [ ] `composer install` sin errores
-- [ ] `php artisan about` muestra PHP 8.3+ y Laravel 11
-- [ ] `php artisan route:list` muestra los 4 endpoints
-- [ ] `php artisan migrate:status` contra `escalebridge` muestra todas las migraciones como `Ran`
-- [ ] Tests nuevos (SQLite en memoria):
+- [x] `composer install` sin errores
+- [x] `php artisan about` muestra PHP 8.3+ y Laravel 11
+- [x] `php artisan route:list` muestra los 4 endpoints
+- [ ] `php artisan migrate:status` contra `escalebridge` muestra todas las migraciones como `Ran` *(pendiente: MySQL no estaba disponible)*
+- [x] Tests nuevos (SQLite en memoria):
   - `GET /api/regiones` devuelve 200 con la estructura `{status, data}`
   - `GET /api/provincias/{id}` devuelve 200 o 404
   - `GET /api/distritos/{id}` devuelve 200 o 404
   - `GET /api/colegios/{ubigeo}` devuelve 200 o 404
   - `sync:locations` con `Http::fake()` maneja tanto un objeto suelto como un array
-- [ ] `php artisan test` en verde
-- [ ] Prueba manual: `php artisan serve` y los 4 endpoints contra la base real
-- [ ] Ejecutar `sync:locations` sobre una región de prueba
+- [x] `php artisan test` en verde
+- [ ] Prueba manual: `php artisan serve` y los 4 endpoints contra la base real *(pendiente)*
+- [ ] Ejecutar `sync:locations` sobre una región de prueba *(pendiente)*
 
 ### Fase 6: documentación
-- [ ] README: requisitos (PHP 8.3, Laravel 11, Composer 2), quitar la advertencia de PHP 8.1 y revisar la estructura
-- [ ] `.env.example` con las claves de Laravel 11 (`APP_LOCALE`, `BCRYPT_ROUNDS`, `LOG_STACK`, etc.)
+- [x] README: requisitos (PHP 8.3, Laravel 11, Composer 2), quitar la advertencia de PHP 8.1 y revisar la estructura
+- [x] `.env.example` con las claves de Laravel 11 (`APP_LOCALE`, `BCRYPT_ROUNDS`, `LOG_STACK`, etc.)
 
 ---
 
@@ -146,3 +148,29 @@ Al terminar se abre un PR `migracion/php-8.3` → `main`.
 1. `git checkout main` (o `git checkout v1-laravel7`)
 2. Restaurar la base: `mysql -u root escalebridge < backup_escalebridge.sql`
 3. Volver a PHP 7.4 en Laragon
+
+---
+
+## 7. Resultado de la ejecución
+
+| Commit | Contenido |
+|---|---|
+| `7f61b9b` | Esqueleto Laravel 12 y composer para PHP 8.3 |
+| `2d5c167` | Modelos, comando y controlador migrados |
+| `a743b19` | Migraciones anónimas, seeders y factories con namespace |
+| `d87ec7c` | `index.php`, `.htaccess` y `web.config` para despliegue sin `public/` |
+| `6777364` | Robustez de `sync:locations` |
+| `a459c1d` | Tests (13 tests, 45 aserciones, en verde) |
+| `9982067` | README para PHP 8.3 |
+
+**Diferencias con el plan:**
+- Destino Laravel 12 en lugar de 11 (ver nota al inicio).
+- `LocationController` usa `SUBSTR()` en vez de `LEFT()`, que no existe en SQLite. El resultado en MySQL es el mismo.
+- El `.htaccess` ahora bloquea `.env`, `.git` y los directorios internos. Antes quedaban accesibles al servir desde la raíz.
+- `QUEUE_FAILED_DRIVER` usa `database` por defecto, porque la tabla `failed_jobs` existente no tiene columna `uuid`.
+
+**Pendiente (requiere MySQL y el hosting):**
+1. `mysqldump` de `escalebridge`.
+2. `php artisan migrate:status`: todas las migraciones deben aparecer como `Ran`.
+3. Probar los 4 endpoints contra la base real y ejecutar `sync:locations`.
+4. Desplegar en el hosting con PHP 8.3 y comprobar que `/.env` y `/vendor/` devuelven 403.
