@@ -5,9 +5,22 @@
 
     RewriteEngine On
 
+    # Bloquear archivos y carpetas ocultos (.env, .git, .editorconfig, ...)
+    RewriteRule (^|/)\. - [F,L]
+
+    # Bloquear directorios internos de Laravel (despliegue sin public/)
+    RewriteRule ^(app|bootstrap|config|database|docs|lang|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+
+    # Bloquear archivos de proyecto en la raíz
+    RewriteRule ^(artisan|composer\.(json|lock)|package(-lock)?\.json|phpunit\.xml|README\.md|webpack\.mix\.js|web\.config)$ - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
