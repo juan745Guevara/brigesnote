@@ -24,7 +24,7 @@ class LocationController extends Controller
      */
     public function getProvinces(string $idRegion): JsonResponse
     {
-        $provinces = Province::whereRaw('LEFT(idProvincia, 2) = ?', [$idRegion])->get();
+        $provinces = Province::whereRaw('SUBSTR(idProvincia, 1, 2) = ?', [$idRegion])->get();
 
         return $provinces->isEmpty()
             ? $this->notFound('No se encontraron provincias para esta región.')
@@ -36,7 +36,7 @@ class LocationController extends Controller
      */
     public function getDistricts(string $idProvince): JsonResponse
     {
-        $districts = District::whereRaw('LEFT(idDistrito, 4) = ?', [$idProvince])->get();
+        $districts = District::whereRaw('SUBSTR(idDistrito, 1, 4) = ?', [$idProvince])->get();
 
         return $districts->isEmpty()
             ? $this->notFound('No se encontraron distritos para esta provincia.')
