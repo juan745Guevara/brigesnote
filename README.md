@@ -1,6 +1,6 @@
 # 🏫 Bridges Note - MINEDU ESCALE Bridge API
 
-Microservicio y API REST en **Laravel 7** diseñado para sincronizar, estructurar y servir el catálogo oficial de instituciones educativas (colegios) y la división política/geográfica (regiones, provincias y distritos) del Perú, consumiendo directamente la API pública oficial de **MINEDU / ESCALE** (*Estadística de la Calidad Educativa*).
+Microservicio y API REST en **Laravel 12** (PHP 8.3) diseñado para sincronizar, estructurar y servir el catálogo oficial de instituciones educativas (colegios) y la división política/geográfica (regiones, provincias y distritos) del Perú, consumiendo directamente la API pública oficial de **MINEDU / ESCALE** (*Estadística de la Calidad Educativa*).
 
 ---
 
@@ -52,12 +52,11 @@ Servir como un **puente de datos optimizado** para aplicaciones cliente (sistema
 
 ## 💻 Requisitos del Sistema
 
-- **PHP:** `7.4.x` (Recomendado) o `8.0.x`.
-  > ⚠️ **Importante:** Laravel 7 no es compatible con PHP 8.1 o superior debido a cambios en la interfaz `ArrayAccess`.
-- **Laravel Framework:** `7.30.7`
+- **PHP:** `8.3` o superior (probado también en 8.4). Extensiones: `pdo_mysql`, `mbstring`, `openssl`, `curl`, `fileinfo`; `pdo_sqlite` solo para ejecutar los tests.
+- **Laravel Framework:** `12.x`
 - **Gestor de Paquetes:** Composer 2.x
 - **Base de Datos:** MySQL 5.7+ / 8.0+ o MariaDB 10.3+
-- **Servidor Web Local:** Laragon (con PHP 7.4 Thread Safe - TS), XAMPP o `php artisan serve`.
+- **Servidor Web Local:** Laragon (con PHP 8.3 Thread Safe - TS), XAMPP o `php artisan serve`.
 
 ---
 
@@ -104,6 +103,12 @@ php artisan serve
 ```
 La aplicación quedará disponible en `http://127.0.0.1:8000`.
 
+### 8. Ejecutar los tests
+Los tests usan SQLite en memoria y simulan la API de ESCALE (`Http::fake()`), así que no tocan la base ni la red:
+```bash
+php artisan test
+```
+
 ---
 
 ## ⚙️ Configuración de Entorno (.env)
@@ -127,9 +132,11 @@ DB_PASSWORD=
 
 # Controlador de sesión en archivo (no requiere tabla 'sessions' en BD)
 SESSION_DRIVER=file
-CACHE_DRIVER=file
+CACHE_STORE=file
 QUEUE_CONNECTION=sync
 ```
+
+> ℹ️ En Laravel 12 la variable de caché se llama `CACHE_STORE` (antes `CACHE_DRIVER`). Revisa `.env.example` para la lista completa.
 
 ---
 
@@ -142,6 +149,8 @@ php artisan sync:locations
 ```
 
 ### ¿Cómo opera la sincronización?
+Cada petición a ESCALE usa un timeout de 30 s y hasta 3 reintentos. Si un nivel falla, se registra el error y el comando continúa con el resto.
+
 1. **Regiones (`/padron/rest/regiones`):** Descarga los 25 departamentos del país con sus nombres, coordenadas (`pointX`, `pointY`) y nivel de `zoom`.
 2. **Provincias (`/padron/rest/provincias?idRegion={id}`):** Por cada región, descarga sus provincias.
 3. **Distritos (`/padron/rest/distritos?idProvincia={id}`):** Por cada provincia, descarga los distritos correspondientes.
@@ -272,8 +281,13 @@ brigesnote/
 │   ├── ..._create_provinces_table.php
 │   ├── ..._create_districts_table.php
 │   └── ..._create_schools_table.php
+├── bootstrap/app.php               # Configuración de la app (rutas, middleware, excepciones)
 ├── routes/
-│   └── api.php                     # Definición de rutas REST
+│   └── api.php                     # Definición de rutas REST (prefijo /api)
+├── tests/Feature/                  # Tests de endpoints y del comando de sincronización
+├── docs/                           # Plan de migración a PHP 8.3
+├── index.php                       # Front controller en la raíz (despliegue sin public/)
+├── .htaccess / web.config          # Reescritura y bloqueo de directorios internos
 ├── .env.example                    # Plantilla de variables de entorno
 └── .gitignore                      # Reglas de exclusión para Git
 ```
@@ -282,9 +296,9 @@ brigesnote/
 
 ## 🛠️ Solución de Problemas Frecuentes
 
-### 1. Error: `During inheritance of ArrayAccess: Return type of ... should either be compatible`
-- **Causa:** Estás ejecutando el proyecto con PHP 8.1, 8.2 o superior.
-- **Solución:** Cambia la versión de PHP en Laragon (o en tu servidor) a **PHP 7.4 (Thread Safe)** o **PHP 8.0**.
+### 1. Error: `Your Composer dependencies require a PHP version ">= 8.3.0"`
+- **Causa:** Estás ejecutando el proyecto con una versión de PHP anterior a 8.3.
+- **Solución:** Cambia la versión de PHP en Laragon (o en tu servidor) a **PHP 8.3 (Thread Safe)** o superior.
 
 ### 2. Error: `Service Apache can not start ... fcgid.conf` en Laragon
 - **Causa:** Descargaste la versión `nts` (Non-Thread Safe) de PHP en Windows.
@@ -292,7 +306,11 @@ brigesnote/
 
 ### 3. Error: `Base table or view not found: 1146 Table '...sessions' doesn't exist`
 - **Causa:** En el archivo `.env` está configurado `SESSION_DRIVER=database` sin haber migrado la tabla de sesiones.
-- **Solución:** Cambia en `.env` a `SESSION_DRIVER=file`.
+- **Solución:** Cambia en `.env` a `SESSION_DRIVER=file` (y `CACHE_STORE=file`).
+
+### 4. Error en tests: `could not find driver (Connection: sqlite ...)`
+- **Causa:** La extensión `pdo_sqlite` no está habilitada en tu PHP.
+- **Solución:** Descomenta `extension=pdo_sqlite` en `php.ini`, o ejecuta una sola vez `php -d extension=pdo_sqlite vendor/bin/phpunit`.
 
 ---
 
